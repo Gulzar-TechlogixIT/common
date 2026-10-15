@@ -1,0 +1,45 @@
+
+name: Reusable Kotlin CI
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Java version for the build
+        type: string
+        required: false
+        default: "21"
+      gradle-task:
+        description: Gradle task to execute
+        type: string
+        required: false
+        default: "build"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout calling service repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: gradle
+
+      - name: Check Gradle Wrapper
+        run: |
+          test -f gradlew
+          test -f gradle/wrapper/gradle-wrapper.properties
+          chmod +x gradlew
+
+      - name: Build and test
+        shell: bash
+        run: ./gradlew --no-daemon ${{ inputs.gradle-task }}
