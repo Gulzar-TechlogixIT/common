@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+﻿from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -6,13 +6,21 @@ import json
 import os
 
 # Layout: <workspace>/common/scripts/local-gateway.py and <workspace>/frontend/index.html
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("WORKSPACE_ROOT", Path(__file__).resolve().parents[2] if len(Path(__file__).resolve().parents) > 2 else "/workspace"))
 PORT = int(os.environ.get("GATEWAY_PORT", "3001"))
 ROUTES = {
-    "/api/kotlin1": "http://127.0.0.1:8081",
-    "/api/kotlin2": "http://127.0.0.1:8084",
-    "/api/python3": "http://127.0.0.1:8086",
-    "/api/kotlin1-python": "http://127.0.0.1:8087",
+    "/api/kotlin1": os.environ.get(
+        "KOTLIN1_URL", "http://127.0.0.1:8081"
+    ),
+    "/api/kotlin2": os.environ.get(
+        "KOTLIN2_URL", "http://127.0.0.1:8084"
+    ),
+    "/api/python3": os.environ.get(
+        "PYTHON3_URL", "http://127.0.0.1:8086"
+    ),
+    "/api/kotlin1-python": os.environ.get(
+        "KOTLIN1_PYTHON_URL", "http://127.0.0.1:8087"
+    ),
 }
 
 
@@ -71,4 +79,4 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Common frontend: http://localhost:{PORT}", flush=True)
     print(f"Frontend file: {ROOT / 'frontend' / 'index.html'}", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
