@@ -20,7 +20,7 @@ permissions:
 jobs:
   build-test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout calling service repository
         uses: actions/checkout@v4
@@ -32,7 +32,21 @@ jobs:
           java-version: ${{ inputs.java-version }}
           cache: gradle
 
+      - name: Publish shared Kotlin libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lib in kot-lib-1 kot-lib-2 kot-lib-3; do
+            git clone --depth 1 "https://github.com/Gulzar-TechlogixIT/${lib}.git" "$RUNNER_TEMP/${lib}"
+            chmod +x "$RUNNER_TEMP/${lib}/gradlew"
+            (
+              cd "$RUNNER_TEMP/${lib}"
+              ./gradlew --no-daemon publishToMavenLocal
+            )
+          done
+
       - name: Check Gradle Wrapper
+        shell: bash
         run: |
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.properties
