@@ -1,57 +1,42 @@
 name: Reusable Kotlin CI
-
 on:
   workflow_call:
     inputs:
       java-version:
-        description: Java version for the build
         type: string
         required: false
         default: "21"
       gradle-task:
-        description: Gradle task to execute
         type: string
         required: false
         default: "build"
-
+    secrets:
+      GH_PACKAGES_USER:
+        required: true
+      GH_PACKAGES_TOKEN:
+        required: true
 permissions:
   contents: read
-
 jobs:
   build-test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout calling service repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ inputs.java-version }}
           cache: gradle
-
-      - name: Publish shared Kotlin libraries
-        shell: bash
+      - name: Validate Gradle wrapper
         run: |
           set -euo pipefail
-          for lib in kot-lib-1 kot-lib-2 kot-lib-3; do
-            git clone --depth 1 "https://github.com/Gulzar-TechlogixIT/${lib}.git" "$RUNNER_TEMP/${lib}"
-            chmod +x "$RUNNER_TEMP/${lib}/gradlew"
-            (
-              cd "$RUNNER_TEMP/${lib}"
-              ./gradlew --no-daemon publishToMavenLocal
-            )
-          done
-
-      - name: Check Gradle Wrapper
-        shell: bash
-        run: |
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
-
-      - name: Build and test
-        shell: bash
-        run: ./gradlew --no-daemon ${{ inputs.gradle-task }}
+      - name: Build and test using published Maven packages
+        env:
+          ORG_GRADLE_PROJECT_githubPackagesUsername: ${{ secrets.GH_PACKAGES_USER }}
+          ORG_GRADLE_PROJECT_githubPackagesPassword: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GRADLE_TASK: ${{ inputs.gradle-task }}
+        run: ./gradlew --no-daemon "$GRADLE_TASK"
