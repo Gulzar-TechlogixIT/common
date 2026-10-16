@@ -1,0 +1,30 @@
+name: Reusable Python CI
+on:
+  workflow_call:
+    inputs:
+      python-version: {type: string, required: false, default: "3.12"}
+      install-command: {type: string, required: false, default: "python -m pip install -e '.[test]'"}
+      test-command: {type: string, required: false, default: "python -m pytest"}
+permissions:
+  contents: read
+jobs:
+  validate-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+      - name: Install service and test dependencies
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          bash -euo pipefail -c "$INSTALL_COMMAND"
+      - name: Run tests
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: bash -euo pipefail -c "$TEST_COMMAND"

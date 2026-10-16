@@ -1,0 +1,59 @@
+name: Deploy approved release
+on:
+  workflow_call:
+    inputs:
+      image: {type: string, required: true}
+      image-digest: {type: string, required: true}
+      deploy-path: {type: string, required: false, default: "/opt/gulzar2"}
+      healthcheck-url: {type: string, required: true}
+    secrets:
+      DEPLOY_HOST: {required: true}
+      DEPLOY_USER: {required: true}
+      DEPLOY_SSH_KEY: {required: true}
+      GHCR_PULL_TOKEN: {required: true}
+permissions:
+  contents: read
+jobs:
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: gulzar2-production
+      cancel-in-progress: false
+    steps:
+      - name: Install deployment SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Production: provision and verify the host key/fingerprint instead of trusting scan output blindly.
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+      - name: Pull and roll out image
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ inputs.deploy-path }}
+          IMAGE: ${{ inputs.image }}
+          DIGEST: ${{ inputs.image-digest }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          HEALTHCHECK_URL: ${{ inputs.healthcheck-url }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && echo '$GHCR_PULL_TOKEN' | docker login ghcr.io -u '$GH_ACTOR' --password-stdin && export RELEASE_IMAGE='$IMAGE@$DIGEST' && docker compose pull && docker compose up -d"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "$HEALTHCHECK_URL"; then
+              echo "Deployment health check passed."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check failed; rolling back."
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./rollback.sh"
+          exit 1
