@@ -26,14 +26,20 @@ jobs:
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
+      
       - name: Configure GitHub Packages credentials
-        if: ${{ secrets.GH_PACKAGES_USER != '' && secrets.GH_PACKAGES_TOKEN != '' }}
         env:
           GH_PACKAGES_USER: ${{ secrets.GH_PACKAGES_USER }}
           GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
-          echo "ORG_GRADLE_PROJECT_githubPackagesUsername=$GH_PACKAGES_USER" >> "$GITHUB_ENV"
-          echo "ORG_GRADLE_PROJECT_githubPackagesPassword=$GH_PACKAGES_TOKEN" >> "$GITHUB_ENV"
+          if [ -n "$GH_PACKAGES_USER" ] && [ -n "$GH_PACKAGES_TOKEN" ]; then
+            echo "ORG_GRADLE_PROJECT_githubPackagesUsername=$GH_PACKAGES_USER" >> "$GITHUB_ENV"
+            echo "ORG_GRADLE_PROJECT_githubPackagesPassword=$GH_PACKAGES_TOKEN" >> "$GITHUB_ENV"
+          else
+            echo "GitHub Packages credentials not provided; skipping credential configuration."
+          fi
+
+      
       - name: Build and test
         env:
           GRADLE_TASK: ${{ inputs.gradle-task }}
